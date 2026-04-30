@@ -3,3 +3,4 @@ python-binance
 streamlit
 pandas
 numpy
+streamlit-autorefresh
