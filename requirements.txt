@@ -1,1 +1,5 @@
 python-dotenv
+python-binance
+streamlit
+pandas
+numpy
