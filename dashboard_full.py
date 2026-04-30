@@ -6,7 +6,7 @@ from binance.client import Client
 from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
 
-
+#streamlit run dashboard_full.py
 # - SETUP -
 load_dotenv()
 
