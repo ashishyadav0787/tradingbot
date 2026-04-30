@@ -1,12 +1,16 @@
 from binance.client import Client
+import streamlit as st
 from dotenv import load_dotenv
 import os
 
 # Load environment variables
-load_dotenv()
-
-API_KEY = os.getenv("API_KEY")
-API_SECRET = os.getenv("API_SECRET")
+try:
+    API_KEY = st.secrets["API_KEY"]
+    API_SECRET = st.secrets["API_SECRET"]
+except:
+    load_dotenv()
+    API_KEY = os.getenv("API_KEY")
+    API_SECRET = os.getenv("API_SECRET")
 
 # Connect to Binance
 client = Client(API_KEY, API_SECRET)

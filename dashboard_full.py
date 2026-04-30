@@ -1,17 +1,18 @@
 import streamlit as st
 import pandas as pd
 import os
-from dotenv import load_dotenv
 from binance.client import Client
 from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
 
 #streamlit run dashboard_full.py
-# - SETUP -
-load_dotenv()
 
-API_KEY = os.getenv("API_KEY")
-API_SECRET = os.getenv("API_SECRET")
+
+# - SETUP -
+
+API_KEY = st.secrets["API_KEY"]
+API_SECRET = st.secrets["API_SECRET"]
+
 
 client = Client(API_KEY, API_SECRET)
 

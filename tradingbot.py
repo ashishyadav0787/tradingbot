@@ -1,15 +1,20 @@
 import pandas as pd
 import time
+import streamlit as st
 import os
 from dotenv import load_dotenv
 from binance.client import Client
 import logging
 
 # - SETUP -
-load_dotenv()
+try:
+    API_KEY = st.secrets["API_KEY"]
+    API_SECRET = st.secrets["API_SECRET"]
+except:
+    load_dotenv()
 
-API_KEY = os.getenv("API_KEY")
-API_SECRET = os.getenv("API_SECRET")
+    API_KEY = os.getenv("API_KEY")
+    API_SECRET = os.getenv("API_SECRET")
 
 client = Client(API_KEY, API_SECRET)
 
