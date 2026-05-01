@@ -1,1 +1,1 @@
-streamlit run dashboard_full.py
+streamlit run app.py
