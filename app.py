@@ -5,13 +5,12 @@ from binance.client import Client
 from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
 
-#streamlit run dashboard_full.py
-# - SETUP -
+# ------------------ SETUP ------------------
+
 try:
     API_KEY = st.secrets["API_KEY"]
     API_SECRET = st.secrets["API_SECRET"]
 except:
-    load_dotenv()
     API_KEY = os.getenv("API_KEY")
     API_SECRET = os.getenv("API_SECRET")
 
@@ -20,11 +19,9 @@ client = Client(API_KEY, API_SECRET)
 SYMBOL = "BTCUSDT"
 INTERVAL = "1m"
 
-st.set_page_config(page_title="Quant Trading Dashboard", layout="wide")
+st.set_page_config(page_title="Trading Dashboard", layout="wide")
+st.title("🚀 Trading Dashboard")
 
-st.title("🚀 Quant Trading Dashboard")
-
-# AUTO REFRESH
 st_autorefresh(interval=5000, key="refresh")
 
 # - PRICE TRACKER -
@@ -55,51 +52,138 @@ try:
 except Exception as e:
     st.warning("Balance not available (API issue or permissions)")
 
-# - MARKET DATA -
+# ------------------ DATA ------------------
 
 @st.cache_data
 def get_data():
-    klines = client.get_klines(symbol=SYMBOL, interval=INTERVAL, limit=200)
-
+    klines = client.get_klines(symbol=SYMBOL, interval=INTERVAL, limit=300)
     df = pd.DataFrame(klines, columns=[
         'time','open','high','low','close','volume',
         'close_time','qav','trades','taker_base','taker_quote','ignore'
     ])
-
     df['close'] = df['close'].astype(float)
+    df['time'] = pd.to_datetime(df['time'], unit='ms')
+
     df['ema9'] = df['close'].ewm(span=9).mean()
     df['ema15'] = df['close'].ewm(span=15).mean()
+
+    df['sma'] = df['close'].rolling(20).mean()
+    df['std'] = df['close'].rolling(20).std()
+    df['upper'] = df['sma'] + 2 * df['std']
+    df['lower'] = df['sma'] - 2 * df['std']
 
     return df
 
 df = get_data()
 
-# - SIGNAL -
+# RSI
+def compute_rsi(series, period=14):
+    delta = series.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(period).mean()
+    rs = gain / loss
+    return 100 - (100 / (1 + rs))
 
-st.subheader("📊 Trading Signal")
+df['rsi'] = compute_rsi(df['close'])
 
-last = df.iloc[-1]
-prev = df.iloc[-2]
+# ------------------ STRATEGY SELECT ------------------
 
-if prev['ema9'] < prev['ema15'] and last['ema9'] > last['ema15']:
-    st.success("🟢 BUY SIGNAL")
+strategy = st.selectbox("Select Strategy", ["EMA + RSI", "Bollinger"])
 
-elif prev['ema9'] > prev['ema15'] and last['ema9'] < last['ema15']:
-    st.error("🔴 SELL SIGNAL")
+# ------------------ BACKTEST ------------------
 
-else:
-    st.warning("⚪ NO SIGNAL")
+balance = 1000
+position = 0
+entry_price = 0
+entry_time = None
 
-# - CHART -
+SL = 0.02
+TP = 0.03
+FEE = 0.001
 
-st.subheader("📈 Candlestick + EMA Chart")
+trades = []
+buy_idx = []
+sell_idx = []
 
-# Convert time
-df['time'] = pd.to_datetime(df['time'], unit='ms')
+TREND_MIN = 20
+COOLDOWN = 10
+USE_VOL_FILTER = True
+VOL_MIN = df['std'].mean() * 0.5
+TREND_THRESHOLD = 30
+last_trade_index = -100
+
+for i in range(20, len(df)-1):
+
+    price = df['close'][i]
+    next_price = df['close'][i+1]
+    next_time = df['time'][i+1]
+
+    trend_strength = abs(df['ema9'][i] - df['ema15'][i])
+
+    # ---------- MARKET TYPE ----------
+    if trend_strength > TREND_THRESHOLD:
+        market_type = "TRENDING"
+    else:
+        market_type = "SIDEWAYS"
+
+    if i - last_trade_index < COOLDOWN:
+        continue
+
+    # ---------- STRATEGY ----------
+    if market_type == "TRENDING":
+        cross_up = df['ema9'][i] > df['ema15'][i] and df['ema9'][i-1] <= df['ema15'][i-1]
+        trend_up = df['ema9'][i] > df['ema15'][i]
+        pullback = price <= df['ema9'][i] * 1.01
+
+        buy_condition = trend_up and pullback and cross_up
+        sell_condition = df['ema9'][i] < df['ema15'][i]
+
+    else:
+        buy_condition = price < df['lower'][i] and df['rsi'][i] < 30
+        sell_condition = price > df['upper'][i]
+
+    # ---------- BUY ----------
+    if position == 0 and buy_condition:
+        position = (balance / next_price) * (1 - FEE)
+        entry_price = next_price
+        entry_time = next_time
+        balance = 0
+        buy_idx.append(i)
+        last_trade_index = i
+
+    # ---------- SELL ----------
+    if position > 0:
+        stop_loss = price < entry_price * (1 - SL)
+        take_profit = price > entry_price * (1 + TP)
+
+        if sell_condition or stop_loss or take_profit:
+            exit_price = next_price
+            exit_time = next_time
+
+            balance = position * exit_price * (1 - FEE)
+
+            pnl = (exit_price - entry_price) * position
+
+            trades.append({
+                "entry_time": entry_time,
+                "exit_time": exit_time,
+                "entry_price": entry_price,
+                "exit_price": exit_price,
+                "pnl": pnl,
+                "market_type": market_type
+            })
+
+            position = 0
+            sell_idx.append(i)
+            last_trade_index = i
+            
+st.write("Current Market Type:", market_type)
+trades_df = pd.DataFrame(trades)
+
+# ------------------ CHART ------------------
 
 fig = go.Figure()
 
-# Candlestick
 fig.add_trace(go.Candlestick(
     x=df['time'],
     open=df['open'].astype(float),
@@ -109,157 +193,39 @@ fig.add_trace(go.Candlestick(
     name="Price"
 ))
 
-# EMA 9
-fig.add_trace(go.Scatter(
-    x=df['time'],
-    y=df['ema9'],
-    mode='lines',
-    name='EMA 9',
-    line=dict(width=2)
-))
+fig.add_trace(go.Scatter(x=df['time'], y=df['ema9'], name="EMA 9"))
+fig.add_trace(go.Scatter(x=df['time'], y=df['ema15'], name="EMA 15"))
 
-# EMA 15
-fig.add_trace(go.Scatter(
-    x=df['time'],
-    y=df['ema15'],
-    mode='lines',
-    name='EMA 15',
-    line=dict(width=2)
-))
-
-# Layout styling
-fig.update_layout(
-    xaxis_title="Time",
-    yaxis_title="Price",
-    xaxis_rangeslider_visible=False,
-    height=600,
-    template="plotly_dark"
-)
-buy_signals = df[(df['ema9'] > df['ema15']) & (df['ema9'].shift(1) <= df['ema15'].shift(1))]
-sell_signals = df[(df['ema9'] < df['ema15']) & (df['ema9'].shift(1) >= df['ema15'].shift(1))]
+fig.add_trace(go.Scatter(x=df['time'], y=df['upper'], name="Upper Band"))
+fig.add_trace(go.Scatter(x=df['time'], y=df['lower'], name="Lower Band"))
 
 fig.add_trace(go.Scatter(
-    x=buy_signals['time'],
-    y=buy_signals['close'],
+    x=df['time'].iloc[buy_idx],
+    y=df['close'].iloc[buy_idx],
     mode='markers',
     name='BUY',
-    marker=dict(size=10, symbol='triangle-up')
+    marker=dict(color='green', size=10)
 ))
 
 fig.add_trace(go.Scatter(
-    x=sell_signals['time'],
-    y=sell_signals['close'],
+    x=df['time'].iloc[sell_idx],
+    y=df['close'].iloc[sell_idx],
     mode='markers',
     name='SELL',
-    marker=dict(size=10, symbol='triangle-down')
+    marker=dict(color='red', size=10)
 ))
+
+fig.update_layout(template="plotly_dark")
 st.plotly_chart(fig, use_container_width=True)
-# - BACKTEST -
 
-st.subheader(" Backtest Result")
+# ------------------ RESULTS ------------------
 
-fees = 0.001  # 0.1% fee
-balance = 1000
-position = 0
+if not trades_df.empty:
+    st.metric("Total PnL", f"{trades_df['pnl'].sum():.2f}")
+    st.metric("Win Rate", f"{(trades_df['pnl'] > 0).mean()*100:.2f}%")
 
-trades = []
-entry_price = 0
-entry_time = None
-
-for i in range(1, len(df)):
-    prev = df.iloc[i-1]
-    curr = df.iloc[i]
-
-    price = curr['close']
-    time = pd.to_datetime(curr['time'], unit='ms')
-
-    # BUY
-    if prev['ema9'] <= prev['ema15'] and curr['ema9'] > curr['ema15'] and position == 0:
-        entry_price = price
-        entry_time = time
-
-        position = (balance * (1 - fees)) / price
-        balance = 0
-
-        print(f"🟢 BUY at {price:.2f} | Time: {time}")
-
-    # SELL
-    elif prev['ema9'] >= prev['ema15'] and curr['ema9'] < curr['ema15'] and position > 0:
-        exit_price = price
-        exit_time = time
-
-        balance = position * price * (1 - fees)
-        position = 0
-
-        pnl = exit_price - entry_price
-
-        trades.append({
-            "entry_price": entry_price,
-            "exit_price": exit_price,
-            "entry_time": entry_time,
-            "exit_time": exit_time,
-            "pnl": pnl
-        })
-
-        print(f"🔴 SELL at {price:.2f} | Time: {time} | PnL: {pnl:.2f}")
-
-        
-# Final value
-final_value = balance if position == 0 else position * df['close'].iloc[-1]
-st.metric("Final Backtest Value", f"${final_value:.2f}")
-
-
-# - TRADE LOG -
-
-st.subheader("📜 Trading Log")
-
-if os.path.exists("trading.log"):
-    try:
-        log_df = pd.read_csv("trading.log", names=["time", "message"])
-        st.dataframe(log_df.tail(20))
-    except:
-        st.write("Log format issue")
-else:
-    st.write("No logs yet...")
-
-st.subheader("📊 Trade Analytics")
-
-try:
-    trades = pd.read_csv("trades.csv")
-
-    total_trades = len(trades)
-    wins = len(trades[trades['pnl'] > 0])
-    losses = len(trades[trades['pnl'] <= 0])
-
-    win_rate = (wins / total_trades) * 100 if total_trades > 0 else 0
-    total_pnl = trades['pnl'].sum()
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric("Total Trades", total_trades)
-    col2.metric("Win Rate", f"{win_rate:.2f}%")
-    col3.metric("Total PnL", f"{total_pnl:.2f}")
-
-    st.line_chart(trades['pnl'].cumsum())
-
-except:
-    st.write("No trades yet")
-
-if len(trades) > 0:
-    trades_df = pd.DataFrame(trades)
-
-    st.subheader("📜 Trade History")
     st.dataframe(trades_df)
 
-    # Metrics
-    total_trades = len(trades_df)
-    wins = len(trades_df[trades_df['pnl'] > 0])
-    win_rate = (wins / total_trades) * 100
-
-    st.metric("Total Trades", total_trades)
-    st.metric("Win Rate", f"{win_rate:.2f}%")
-    st.metric("Total PnL", f"{trades_df['pnl'].sum():.2f}")
-
-    # Equity curve
-    st.subheader("📈 Equity Curve")
     st.line_chart(trades_df['pnl'].cumsum())
+else:
+    st.warning("No trades generated yet")
