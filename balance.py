@@ -6,7 +6,7 @@ import os
 
 # Load environment variables
 try:
-    API_KEY = st.ecrets["API_KEY"]
+    API_KEY = st.secrets["API_KEY"]
     API_SECRET = st.secrets["API_SECRET"]
 except:
     load_dotenv()
