@@ -18,15 +18,24 @@ df['ema9'] = df['close'].ewm(span=9).mean()
 df['ema15'] = df['close'].ewm(span=15).mean()
 
 balance = 1000
+fees=0.001
 position = 0
 
 for i in range(1, len(df)):
-    if df['ema9'][i] > df['ema15'][i] and position == 0:
-        position = balance / df['close'][i]
+    price = df['close'][i]
+
+    # BUY (CROSS ABOVE)
+    if df['ema9'][i] > df['ema15'][i] and df['ema9'][i-1] <= df['ema15'][i-1] and position == 0:
+        entry_price = price        
+        position = (balance / price)*(1-fees)
         balance = 0
+        print(f"🟢 BUY at {price:.2f} | Index: {i}")
 
-    elif df['ema9'][i] < df['ema15'][i] and position > 0:
-        balance = position * df['close'][i]
+    # SELL (CROSS BELOW)
+    elif df['ema9'][i] < df['ema15'][i] and df['ema9'][i-1] >= df['ema15'][i-1] and position > 0:
+        exit_price = price
+        balance = (position * price)*(1-fees)
         position = 0
-
+        pnl = exit_price - entry_price
+        print(f"🔴 SELL at {price:.2f} | Index: {i} | PnL: {pnl:.2f}")
 print("Final Balance:", balance)

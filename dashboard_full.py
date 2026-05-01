@@ -6,18 +6,19 @@ from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
 
 #streamlit run dashboard_full.py
-
-
 # - SETUP -
-
-API_KEY = st.secrets["API_KEY"]
-API_SECRET = st.secrets["API_SECRET"]
-
+try:
+    API_KEY = st.secrets["API_KEY"]
+    API_SECRET = st.secrets["API_SECRET"]
+except:
+    load_dotenv()
+    API_KEY = os.getenv("API_KEY")
+    API_SECRET = os.getenv("API_SECRET")
 
 client = Client(API_KEY, API_SECRET)
 
 SYMBOL = "BTCUSDT"
-INTERVAL = "5m"
+INTERVAL = "1m"
 
 st.set_page_config(page_title="Quant Trading Dashboard", layout="wide")
 
@@ -155,23 +156,57 @@ fig.add_trace(go.Scatter(
 st.plotly_chart(fig, use_container_width=True)
 # - BACKTEST -
 
-st.subheader("🧪 Backtest Result")
+st.subheader(" Backtest Result")
 
+fees = 0.001  # 0.1% fee
 balance = 1000
 position = 0
 
+trades = []
+entry_price = 0
+entry_time = None
+
 for i in range(1, len(df)):
-    if df['ema9'][i] > df['ema15'][i] and position == 0:
-        position = balance / df['close'][i]
+    prev = df.iloc[i-1]
+    curr = df.iloc[i]
+
+    price = curr['close']
+    time = pd.to_datetime(curr['time'], unit='ms')
+
+    # BUY
+    if prev['ema9'] <= prev['ema15'] and curr['ema9'] > curr['ema15'] and position == 0:
+        entry_price = price
+        entry_time = time
+
+        position = (balance * (1 - fees)) / price
         balance = 0
 
-    elif df['ema9'][i] < df['ema15'][i] and position > 0:
-        balance = position * df['close'][i]
+        print(f"🟢 BUY at {price:.2f} | Time: {time}")
+
+    # SELL
+    elif prev['ema9'] >= prev['ema15'] and curr['ema9'] < curr['ema15'] and position > 0:
+        exit_price = price
+        exit_time = time
+
+        balance = position * price * (1 - fees)
         position = 0
 
-final_value = balance if position == 0 else position * df['close'].iloc[-1]
+        pnl = exit_price - entry_price
 
+        trades.append({
+            "entry_price": entry_price,
+            "exit_price": exit_price,
+            "entry_time": entry_time,
+            "exit_time": exit_time,
+            "pnl": pnl
+        })
+
+        print(f"🔴 SELL at {price:.2f} | Time: {time} | PnL: {pnl:.2f}")
+
+# Final value
+final_value = balance if position == 0 else position * df['close'].iloc[-1]
 st.metric("Final Backtest Value", f"${final_value:.2f}")
+
 
 # - TRADE LOG -
 
@@ -185,3 +220,45 @@ if os.path.exists("trading.log"):
         st.write("Log format issue")
 else:
     st.write("No logs yet...")
+
+st.subheader("📊 Trade Analytics")
+
+try:
+    trades = pd.read_csv("trades.csv")
+
+    total_trades = len(trades)
+    wins = len(trades[trades['pnl'] > 0])
+    losses = len(trades[trades['pnl'] <= 0])
+
+    win_rate = (wins / total_trades) * 100 if total_trades > 0 else 0
+    total_pnl = trades['pnl'].sum()
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric("Total Trades", total_trades)
+    col2.metric("Win Rate", f"{win_rate:.2f}%")
+    col3.metric("Total PnL", f"{total_pnl:.2f}")
+
+    st.line_chart(trades['pnl'].cumsum())
+
+except:
+    st.write("No trades yet")
+
+if len(trades) > 0:
+    trades_df = pd.DataFrame(trades)
+
+    st.subheader("📜 Trade History")
+    st.dataframe(trades_df)
+
+    # Metrics
+    total_trades = len(trades_df)
+    wins = len(trades_df[trades_df['pnl'] > 0])
+    win_rate = (wins / total_trades) * 100
+
+    st.metric("Total Trades", total_trades)
+    st.metric("Win Rate", f"{win_rate:.2f}%")
+    st.metric("Total PnL", f"{trades_df['pnl'].sum():.2f}")
+
+    # Equity curve
+    st.subheader("📈 Equity Curve")
+    st.line_chart(trades_df['pnl'].cumsum())

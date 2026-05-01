@@ -1,40 +1,53 @@
 import pandas as pd
 import time
-import streamlit as st
 import os
 from dotenv import load_dotenv
 from binance.client import Client
 import logging
 
-# - SETUP -
-try:
-    API_KEY = st.secrets["API_KEY"]
-    API_SECRET = st.secrets["API_SECRET"]
-except:
-    load_dotenv()
+# ------------------ SETUP ------------------
+load_dotenv()
 
-    API_KEY = os.getenv("API_KEY")
-    API_SECRET = os.getenv("API_SECRET")
+API_KEY = os.getenv("API_KEY")
+API_SECRET = os.getenv("API_SECRET")
 
 client = Client(API_KEY, API_SECRET)
 
 SYMBOL = "BTCUSDT"
-INTERVAL = "5m"
-TRADE_AMOUNT = 50   # USDT
-STOP_LOSS = 0.02    # 2%
+INTERVAL = "1m"
+TRADE_AMOUNT = 50
+STOP_LOSS = 0.02
 
 in_position = False
 buy_price = 0
 
-# - LOGGING -
-logging.basicConfig(
-    filename="trading.log",
-    level=logging.INFO,
-    format="%(asctime)s - %(message)s"
-)
+# ------------------ FILE PATH ------------------
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TRADE_FILE = os.path.join(BASE_DIR, "trades.csv")
 
-# - FUNCTIONS -
+# ------------------ LOG TRADE ------------------
+def log_trade(entry, exit_price, exit_type):
+    pnl = exit_price - entry
 
+    trade = pd.DataFrame([{
+        "entry": entry,
+        "exit": exit_price,
+        "type": exit_type,
+        "pnl": pnl
+    }])
+
+    file_exists = os.path.exists(TRADE_FILE)
+
+    trade.to_csv(
+        TRADE_FILE,
+        mode='a',
+        header=not file_exists,
+        index=False
+    )
+
+    print("✅ Trade saved")
+
+# ------------------ DATA ------------------
 def get_data():
     klines = client.get_klines(symbol=SYMBOL, interval=INTERVAL, limit=100)
 
@@ -46,31 +59,26 @@ def get_data():
 
     return df
 
+# ------------------ BUY ------------------
 def buy(price):
     global in_position, buy_price
 
-    qty = round(TRADE_AMOUNT / price, 5)
-
-    print(f"BUY at {price}")
-    logging.info(f"BUY at {price}")
-
-    # Uncomment for real trade
-    # client.order_market_buy(symbol=SYMBOL, quantity=qty)
-
+    print(f"🟢 BUY at {price}")
     in_position = True
     buy_price = price
 
-def sell(price):
-    global in_position
+# ------------------ SELL ------------------
+def sell(price, reason="SIGNAL"):
+    global in_position, buy_price
 
-    print(f"SELL at {price}")
-    logging.info(f"SELL at {price}")
+    print(f"🔴 SELL at {price} ({reason})")
 
-    # Uncomment for real trade
-    # client.order_market_sell(symbol=SYMBOL, quantity=qty)
+    # 🔥 LOG TRADE (MOST IMPORTANT)
+    log_trade(buy_price, price, reason)
 
     in_position = False
 
+# ------------------ STRATEGY ------------------
 def strategy():
     global in_position, buy_price
 
@@ -81,35 +89,29 @@ def strategy():
 
     price = last[4]
 
-    # BUY CONDITION
+    # BUY SIGNAL
     if prev['ema9'] < prev['ema15'] and last['ema9'] > last['ema15']:
         if not in_position:
             buy(price)
 
-    # SELL CONDITION
+    # SELL SIGNAL
     elif prev['ema9'] > prev['ema15'] and last['ema9'] < last['ema15']:
         if in_position:
-            sell(price)
+            sell(price, "CROSSOVER")
 
     # STOP LOSS
-    if in_position:
-        if price < buy_price * (1 - STOP_LOSS):
-            print("STOP LOSS HIT")
-            logging.info("STOP LOSS HIT")
-            sell(price)
+    if in_position and price < buy_price * (1 - STOP_LOSS):
+        sell(price, "STOP LOSS")
 
-    print(f"Price: {price} | EMA9: {last['ema9']:.2f} | EMA15: {last['ema15']:.2f}")
+    print(f"Price: {price:.2f}")
 
-# - MAIN LOOP -
-
-print(" Bot Started...")
+# ------------------ MAIN LOOP ------------------
+print("🚀 Bot Started...")
 
 while True:
     try:
         strategy()
-        time.sleep(20)
-
+        time.sleep(5)
     except Exception as e:
         print("Error:", e)
-        logging.error(f"Error: {e}")
-        time.sleep(30)
+        time.sleep(10)
