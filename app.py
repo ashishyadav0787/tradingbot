@@ -203,6 +203,7 @@ for i in range(1, len(df)):
 
         print(f"🔴 SELL at {price:.2f} | Time: {time} | PnL: {pnl:.2f}")
 
+        
 # Final value
 final_value = balance if position == 0 else position * df['close'].iloc[-1]
 st.metric("Final Backtest Value", f"${final_value:.2f}")

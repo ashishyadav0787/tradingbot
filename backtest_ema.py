@@ -38,4 +38,17 @@ for i in range(1, len(df)):
         position = 0
         pnl = exit_price - entry_price
         print(f"🔴 SELL at {price:.2f} | Index: {i} | PnL: {pnl:.2f}")
-print("Final Balance:", balance)
+
+    # 🔥 PRINT WHEN IN POSITION
+    if position > 0:
+        unrealized_pnl = (price - entry_price) * position
+        print(f"In Trade | Price: {price:.2f} | Unrealized PnL: {unrealized_pnl:.2f}")
+        
+# ✅ FINAL VALUE (IMPORTANT FIX)
+final_value = balance if position == 0 else position * df['close'].iloc[-1]
+
+# ✅ TOTAL PnL
+total_pnl = sum(pnl)
+
+print("Final Value:", final_value)
+print("Total PnL:", total_pnl)
