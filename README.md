@@ -55,32 +55,12 @@ tradingbot/
 ├── requirements.txt
 └── README.md
 
-⚡ Installation
-1. Clone the repository
-git clone https://github.com/ashishyadav0787/tradingbot.git
-cd tradingbot
-2. Install dependencies
-pip install -r requirements.txt
-3. Add API Keys
-🔹 Option 1 (Local)
-
-Create .env:
-
-API_KEY=your_api_key
-API_SECRET=your_secret
-🔹 Option 2 (Streamlit Cloud)
-
-Create .streamlit/secrets.toml:
-
-API_KEY="your_api_key"
-API_SECRET="your_secret"
-
 🚀 Usage
 ▶️ Run Trading Bot
 python tradingbot.py
 
 📊 Run Dashboard
-streamlit run dashboard_full.py
+streamlit run app.py
 
 🧪 Run Backtest
 python backtest_ema.py
