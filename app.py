@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 import streamlit as st
 import pandas as pd
 import os
@@ -7,10 +8,12 @@ import plotly.graph_objects as go
 
 # ------------------ SETUP ------------------
 
+
 try:
     API_KEY = st.secrets["API_KEY"]
     API_SECRET = st.secrets["API_SECRET"]
 except:
+    load_dotenv()
     API_KEY = os.getenv("API_KEY")
     API_SECRET = os.getenv("API_SECRET")
 
@@ -176,7 +179,7 @@ for i in range(20, len(df)-1):
             position = 0
             sell_idx.append(i)
             last_trade_index = i
-            
+
 st.write("Current Market Type:", market_type)
 trades_df = pd.DataFrame(trades)
 

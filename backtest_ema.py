@@ -3,6 +3,7 @@ from binance.client import Client
 import numpy as np
 import streamlit as st
 import os 
+
 API_KEY = st.secrets["API_KEY"]
 API_SECRET = st.secrets["API_SECRET"]
 client = Client(API_KEY, API_SECRET)
