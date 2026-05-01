@@ -1,158 +1,92 @@
-#  Crypto Trading Bot & Quant Dashboard
+🚀 TradingBot — Algorithmic Crypto Trading System
 
-##  Overview
+A Python-based algorithmic trading system that combines multiple technical strategies, real-time data processing, and interactive dashboards for cryptocurrency trading.
 
-This project is a complete **algorithmic trading system** that integrates:
+This project demonstrates strategy design, backtesting, and visualization using live market data from Binance.
 
-* Live crypto market data
-* Trading strategy (EMA crossover)
-* Backtesting engine
-* Binance account integration
-* Interactive dashboard
+📌 Features
+📊 Multi-Strategy Trading System
+EMA Crossover (Trend Following)
+RSI Momentum Filter
+Bollinger Bands (Mean Reversion)
 
-It is designed to simulate a **real-world quant trading workflow** including research, execution, and monitoring.
+🤖 Smart Market Detection
+Automatically identifies:
+TRENDING market → uses EMA strategy
+SIDEWAYS market → uses Bollinger strategy
 
-##  Strategy
+📉 Backtesting Engine
+Simulates trades on historical data
+Calculates:
+PnL (Profit & Loss)
+Win Rate
+Trade History
 
-The system uses a simple yet effective **EMA (Exponential Moving Average) crossover strategy**:
+📈 Interactive Dashboard (Streamlit)
+Live BTC price tracking
+Trade visualization with BUY/SELL signals
+Strategy performance metrics
+Candlestick charts with indicators
 
-* **Buy Signal** → EMA(9) crosses above EMA(15)
-* **Sell Signal** → EMA(9) crosses below EMA(15)
-* **Risk Management** → Stop-loss implemented
+⚙️ Risk Management
+Stop Loss
+Take Profit
+Cooldown period (prevents overtrading)
+Volatility filter
 
+🧠 Strategy Logic
+📈 Trending Market (EMA + RSI)
+EMA(9) crosses above EMA(15)
+Price near EMA (pullback entry)
+Avoid overbought zones
 
-##  Features
+📊 Sideways Market (Bollinger Bands)
+Buy when price touches lower band
+RSI confirms oversold (<30)
+Sell at upper band
 
-### 📊 Market Data
-
-* Live BTC price tracking
-* Historical OHLC data from Binance
-
-###  Trading Bot
-
-* Automated EMA-based signals
-* Position tracking
-* Logging system (`trading.log`)
-* Stop-loss mechanism
-
-### 🧪 Backtesting
-
-* Strategy performance evaluation
-* Simulated portfolio growth
-* Capital-based trade execution
-
-### 🏦 Account Integration
-
-* Fetch real account balances via Binance API
-* Secure API key handling using `.env`
-
-### 📈 Dashboard
-
-Built using streamlit
-
-* Live price display
-* Candlestick chart with EMAs
-* Buy/Sell signals
-* Account balances
-* Backtest results
-* Trade logs
-
----
-
-##  Tech Stack
-
-* Python
-* Pandas
-* Binance API
-* Streamlit
-* Plotly
-* dotenv
-
----
-
-## 📁 Project Structure
-
-```
-crypto-trading-bot/
+🏗️ Project Structure
+tradingbot/
 │
-├── dashboard_full.py        # Streamlit dashboard
-├── trading_bot.py           # Live trading bot
-├── backtest_ema.py          # Backtesting engine
-├── price_tracker.py         # Live BTC price
-├── balance.py               # Binance balance
-│
-├── trading.log              # Logs (auto-generated)
-├── .env                     # API keys (not committed)
+├── tradingbot.py        # Live trading logic (simulation)
+├── backtest_ema.py      # Backtesting engine
+├── dashboard_full.py    # Streamlit dashboard
+├── trades.csv           # Trade logs
 ├── requirements.txt
 └── README.md
-```
 
----
+⚡ Installation
+1. Clone the repository
+git clone https://github.com/ashishyadav0787/tradingbot.git
+cd tradingbot
+2. Install dependencies
+pip install -r requirements.txt
+3. Add API Keys
+🔹 Option 1 (Local)
 
-## ⚙️ Setup
+Create .env:
 
-### 1️⃣ Clone Repository
-
-```bash
-git clone https://github.com/yourusername/crypto-trading-bot.git
-cd crypto-trading-bot
-```
-
-### 2️⃣ Install Dependencies
-
-```bash
-pip3 install -r requirements.txt
-```
-
-### 3️⃣ Add API Keys
-
-Create a `.env` file:
-
-```
 API_KEY=your_api_key
-API_SECRET=your_api_secret
-```
+API_SECRET=your_secret
+🔹 Option 2 (Streamlit Cloud)
 
----
+Create .streamlit/secrets.toml:
 
-## ▶️ Usage
+API_KEY="your_api_key"
+API_SECRET="your_secret"
 
-### Run Trading Bot
+🚀 Usage
+▶️ Run Trading Bot
+python tradingbot.py
 
-```bash
-python3 trading_bot.py
-```
-
-### Run Dashboard
-
-```bash
+📊 Run Dashboard
 streamlit run dashboard_full.py
-```
 
-### Run Backtest
+🧪 Run Backtest
+python backtest_ema.py
 
-```bash
-python3 backtest_ema.py
-```
-
----
-
-## 📊 Dashboard Preview
-
-* Live BTC price
-* EMA crossover signals
-* Candlestick chart
-* Account balances
-* Strategy backtest
-* Trade logs
-
----
-
-## 🎯 Future Improvements
-
-* Multi-asset portfolio trading
-* Machine learning signals
-* Risk-adjusted metrics (Sharpe ratio, drawdown)
-* Portfolio optimization
-* Cloud deployment
-
+📊 Example Output
+Final Balance
+Total Trades
+Win Rate
+Trade History
